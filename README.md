@@ -20,11 +20,38 @@ Take the file for your system from the [latest release](../../releases/latest).
 
 ## Install
 
+There are two ways, and they give the same app: one command in a terminal, or a file you
+download and open.
+
+### With one command
+
+**macOS and Linux**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/snowfallen/kumodesk-releases/main/install.sh | sh
+```
+
+**macOS with Homebrew**
+
+```sh
+brew tap snowfallen/kumodesk https://github.com/snowfallen/kumodesk-releases
+brew install --cask kumodesk
+```
+
+**Windows** (in PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/snowfallen/kumodesk-releases/main/install.ps1 | iex
+```
+
+To update, run the same command again (with Homebrew: `brew upgrade --cask kumodesk`).
+
+### With a file
+
 **macOS.** Open the `.dmg` and drag kumodesk to Applications. The app is not signed yet, so
 macOS refuses to start it the first time ("Apple could not verify…"). Press **Done**, then
 open **System Settings → Privacy & Security**, scroll down to the line about kumodesk and press
-**Open Anyway**. This is needed once. The same from Terminal:
-`xattr -dr com.apple.quarantine /Applications/kumodesk.app`
+**Open Anyway**. This is needed once. Installing with a command above avoids this step.
 
 **Windows.** Run the setup. If SmartScreen stops it, choose **More info**, then **Run anyway**.
 
