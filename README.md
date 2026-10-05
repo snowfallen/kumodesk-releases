@@ -21,7 +21,10 @@ Take the file for your system from the [latest release](../../releases/latest).
 ## Install
 
 **macOS.** Open the `.dmg` and drag kumodesk to Applications. The app is not signed yet, so
-the first time right-click it in Applications and choose **Open**, then **Open** again.
+macOS refuses to start it the first time ("Apple could not verify…"). Press **Done**, then
+open **System Settings → Privacy & Security**, scroll down to the line about kumodesk and press
+**Open Anyway**. This is needed once. The same from Terminal:
+`xattr -dr com.apple.quarantine /Applications/kumodesk.app`
 
 **Windows.** Run the setup. If SmartScreen stops it, choose **More info**, then **Run anyway**.
 
