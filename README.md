@@ -6,6 +6,12 @@ An infinite board for your windows. Web pages, notes, tasks, a calendar, tables,
 terminals stand side by side on one board that you move around and zoom, instead of piling up
 behind each other. It is made for anyone who works at a computer, not only for programmers.
 
+![A minute with Kumodesk: a board for a project is laid out, a line is written to the assistant, a long job runs on one board while another is in view, and a notice says when it is done](pictures/preview.gif)
+
+The same minute as a [video](pictures/preview.mp4): a ready board for a project, more windows
+added, one click that gives every window the room it needs, a line written to the assistant
+that brings its window into view, and a notice when a long job on another board has finished.
+
 ![An empty board asks what to start with](pictures/welcome.png)
 
 ## Download
