@@ -32,22 +32,30 @@ fetch() {
 case "$(uname -s)" in
   Darwin)
     case "$(uname -m)" in
-      arm64) file="kumodesk-$version-arm64-mac.zip" ;;
-      *) file="kumodesk-$version-mac.zip" ;;
+      arm64) arch="arm64" ;;
+      *) arch="x64" ;;
     esac
-    if pgrep -x kumodesk >/dev/null 2>&1; then
-      fail "kumodesk is running: quit it and run this again"
+    if pgrep -xi kumodesk >/dev/null 2>&1; then
+      fail "Kumodesk is running: quit it and run this again"
+    fi
+    file="kumodesk-$version-$arch-mac.zip"
+    # Versions before 0.1.4 named the file for Intel without the word.
+    if [ "$arch" = "x64" ] && ! curl -fsIL -o /dev/null "$REPO/releases/download/v$version/$file"; then
+      file="kumodesk-$version-mac.zip"
     fi
     fetch "$file"
     /usr/bin/ditto -x -k "$tmp/$file" "$tmp/app"
-    [ -d "$tmp/app/kumodesk.app" ] || fail "the download holds no app"
+    app=$(find "$tmp/app" -maxdepth 1 -name '*.app' | head -n 1)
+    [ -n "$app" ] || fail "the download holds no app"
     dest="/Applications"
     [ -w "$dest" ] || dest="$HOME/Applications"
     mkdir -p "$dest"
-    rm -rf "$dest/kumodesk.app"
-    mv "$tmp/app/kumodesk.app" "$dest/kumodesk.app"
-    /usr/bin/xattr -dr com.apple.quarantine "$dest/kumodesk.app" 2>/dev/null || true
-    say "kumodesk $version is in $dest. Start it from Launchpad or: open -a kumodesk"
+    # Earlier versions were called kumodesk.app; on most disks that is the same name.
+    rm -rf "$dest/kumodesk.app" "$dest/Kumodesk.app"
+    name=$(basename "$app")
+    mv "$app" "$dest/$name"
+    /usr/bin/xattr -dr com.apple.quarantine "$dest/$name" 2>/dev/null || true
+    say "Kumodesk $version is in $dest. Start it from Launchpad or: open -a Kumodesk"
     ;;
   Linux)
     [ "$(uname -m)" = "x86_64" ] || fail "only x86_64 Linux is built so far"

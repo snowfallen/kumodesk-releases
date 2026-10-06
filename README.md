@@ -1,6 +1,6 @@
 <p align="center"><img src="pictures/icon.png" width="120" alt="kumodesk"></p>
 
-# kumodesk
+# Kumodesk
 
 An infinite board for your windows. Web pages, notes, tasks, a calendar, tables, pictures and
 terminals stand side by side on one board that you move around and zoom, instead of piling up
@@ -14,7 +14,7 @@ Take the file for your system from the [latest release](../../releases/latest).
 
 | System  | File                                                                 |
 | ------- | -------------------------------------------------------------------- |
-| macOS   | `kumodesk-…-arm64.dmg` for Apple silicon, `kumodesk-….dmg` for Intel |
+| macOS   | `kumodesk-…-arm64.dmg` for Apple silicon, `kumodesk-…-x64.dmg` for Intel |
 | Windows | `kumodesk-…-setup.exe`                                               |
 | Linux   | `kumodesk-….AppImage`, or `kumodesk_…_amd64.deb`                     |
 
@@ -44,13 +44,14 @@ brew install --cask kumodesk
 irm https://raw.githubusercontent.com/snowfallen/kumodesk-releases/main/install.ps1 | iex
 ```
 
-To update, run the same command again (with Homebrew: `brew upgrade --cask kumodesk`).
+To update, run the same command again (with Homebrew: `brew upgrade --cask kumodesk`). From
+version 0.1.4 the app also looks for updates itself and asks before installing one.
 
 ### With a file
 
-**macOS.** Open the `.dmg` and drag kumodesk to Applications. The app is not signed yet, so
+**macOS.** Open the `.dmg` and drag Kumodesk to Applications. The app is not signed yet, so
 macOS refuses to start it the first time ("Apple could not verify…"). Press **Done**, then
-open **System Settings → Privacy & Security**, scroll down to the line about kumodesk and press
+open **System Settings → Privacy & Security**, scroll down to the line about Kumodesk and press
 **Open Anyway**. This is needed once. Installing with a command above avoids this step.
 
 **Windows.** Run the setup. If SmartScreen stops it, choose **More info**, then **Run anyway**.
