@@ -1,0 +1,234 @@
+# Builds the installers of a version for macOS, Windows and Linux and publishes them here.
+#
+# The code lives in another, private repository; this one is public, and so are the logs of
+# these runs. The code is fetched with a key that can only read it (the SOURCE_KEY secret:
+# the private half of a read-only deploy key of the code repository) and nothing of it is
+# kept or shown: only the installers leave the machines.
+#
+# Started by the code repository when a version tag is pushed there (a `release` event that
+# names the tag), or by hand with the tag.
+name: Release
+
+on:
+  repository_dispatch:
+    types: [release]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The version tag to build, as v1.2.3
+        required: true
+
+env:
+  SOURCE_REPO: snowfallen/kumodesk
+  TAG: ${{ github.event.client_payload.tag || inputs.tag }}
+
+permissions:
+  contents: write
+
+# Two runs for one version would write the same release at once.
+concurrency:
+  group: release-${{ github.event.client_payload.tag || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  # The page the installers are added to; nobody sees it until it is complete.
+  draft:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the tag
+        run: |
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "Not a version tag: $TAG" >&2; exit 1 ;;
+          esac
+      - name: Start the release, unseen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A run started again finds what the first one made.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            exit 0
+          fi
+          cat > notes.md <<NOTES
+          ## Install with one command
+
+          macOS and Linux:
+
+              curl -fsSL https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/install.sh | sh
+
+          macOS with Homebrew:
+
+              brew tap snowfallen/kumodesk https://github.com/$GITHUB_REPOSITORY
+              brew install --cask kumodesk
+
+          Windows, in PowerShell:
+
+              irm https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/install.ps1 | iex
+
+          ## Or with a file
+
+          - **macOS** — \`.dmg\`: \`arm64\` for Apple silicon, \`x64\` for Intel. Open it and drag Kumodesk to Applications. It is not signed yet, so the first start is refused: press Done, open System Settings → Privacy & Security, scroll down and press Open Anyway.
+          - **Windows** — \`setup.exe\`. If SmartScreen stops it, choose More info, then Run anyway.
+          - **Linux** — \`.AppImage\` (make it executable and run it) or \`.deb\`.
+          NOTES
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --title "Kumodesk ${TAG#v}" \
+            --notes-file notes.md
+
+  build:
+    needs: draft
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            flags: --mac --arm64 --x64
+          - os: windows-latest
+            flags: --win --x64
+          - os: ubuntu-latest
+            flags: --linux --x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SOURCE_REPO }}
+          ref: ${{ env.TAG }}
+          ssh-key: ${{ secrets.SOURCE_KEY }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Check the tag is the version being built
+        shell: bash
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$version" != "$TAG" ]; then
+            echo "The tag $TAG does not match package.json ($version)." >&2
+            exit 1
+          fi
+      - name: Check the code
+        if: runner.os == 'Linux'
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+      - run: npm run build
+      - name: Package
+        run: npx electron-builder ${{ matrix.flags }} --publish never
+        env:
+          # Nothing is signed yet; do not look for certificates on the machine.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Add the installers to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=()
+          for file in dist/*.dmg dist/*.zip dist/*.exe dist/*.AppImage dist/*.deb dist/*.yml dist/*.blockmap; do
+            case "$file" in dist/builder-*.yml) continue ;; esac
+            [ -f "$file" ] && files+=("$file")
+          done
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "Nothing was packaged." >&2
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show the release to everyone
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.dmg' --dir "$RUNNER_TEMP/installers"
+      - name: Tell Homebrew about the new version
+        run: |
+          version="${TAG#v}"
+          arm=$(sha256sum "$RUNNER_TEMP/installers/kumodesk-$version-arm64.dmg" | cut -d' ' -f1)
+          intel=$(sha256sum "$RUNNER_TEMP/installers/kumodesk-$version-x64.dmg" | cut -d' ' -f1)
+          mkdir -p Casks
+          cat > Casks/kumodesk.rb <<CASK
+          cask "kumodesk" do
+            arch arm: "arm64", intel: "x64"
+
+            version "$version"
+            sha256 arm:   "$arm",
+                   intel: "$intel"
+
+            url "https://github.com/$GITHUB_REPOSITORY/releases/download/v#{version}/kumodesk-#{version}-#{arch}.dmg"
+            name "Kumodesk"
+            desc "Infinite board for your windows"
+            homepage "https://github.com/$GITHUB_REPOSITORY"
+
+            app "Kumodesk.app"
+
+            # The app is not signed yet; without this macOS refuses to start it.
+            postflight do
+              system_command "/usr/bin/xattr",
+                             args: ["-dr", "com.apple.quarantine", "#{appdir}/Kumodesk.app"]
+            end
+
+            zap trash: "~/Library/Application Support/kumodesk"
+          end
+          CASK
+          git add Casks/kumodesk.rb
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name="$GITHUB_REPOSITORY_OWNER" \
+            -c user.email="$GITHUB_REPOSITORY_OWNER@users.noreply.github.com" \
+            commit -m "chore: Kumodesk $version for Homebrew"
+          git push
+
+  # Installs what was just published the way a person would, on each system.
+  try:
+    needs: publish
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install with the script (macOS, Linux)
+        if: runner.os != 'Windows'
+        run: |
+          export KUMODESK_VERSION="${TAG#v}"
+          curl -fsSL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/install.sh" | sh
+      - name: It is there (Linux)
+        if: runner.os == 'Linux'
+        run: dpkg -s kumodesk && command -v kumodesk
+      - name: It starts (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          test -d /Applications/kumodesk.app
+          # By its path: a program copied a moment ago is not yet known to the system by name.
+          open /Applications/kumodesk.app
+          sleep 20
+          pgrep -xi kumodesk
+          pkill -xi kumodesk || true
+          sleep 3
+          rm -rf /Applications/kumodesk.app
+      - name: Install with Homebrew (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew tap snowfallen/kumodesk "https://github.com/$GITHUB_REPOSITORY"
+          # Homebrew loads a cask from a tap of someone else only once the tap is trusted; a
+          # Homebrew from before that rule has no such command, and needs none.
+          brew trust snowfallen/kumodesk || true
+          brew install --cask kumodesk
+          test -d /Applications/kumodesk.app
+          open /Applications/kumodesk.app
+          sleep 20
+          pgrep -xi kumodesk
+      - name: Install with the script (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:KUMODESK_VERSION = $env:TAG.TrimStart('v')
+          irm "https://raw.githubusercontent.com/$env:GITHUB_REPOSITORY/main/install.ps1" | iex
+          if (-not (Test-Path "$env:LOCALAPPDATA\Programs\kumodesk\kumodesk.exe")) { throw 'kumodesk.exe is not there' }
