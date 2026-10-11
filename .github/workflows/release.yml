@@ -69,7 +69,7 @@ jobs:
 
           - **macOS** — \`.dmg\`: \`arm64\` for Apple silicon, \`x64\` for Intel. Open it and drag Kumodesk to Applications. It is not signed yet, so the first start is refused: press Done, open System Settings → Privacy & Security, scroll down and press Open Anyway.
           - **Windows** — \`setup.exe\`. If SmartScreen stops it, choose More info, then Run anyway.
-          - **Linux** — \`.AppImage\` (make it executable and run it) or \`.deb\`.
+          - **Linux** — \`.deb\` for Debian and Ubuntu, \`.pkg.tar.zst\` for Arch (\`sudo pacman -U\` and the file), or the \`.AppImage\` anywhere (make it executable and run it).
           NOTES
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
@@ -88,7 +88,7 @@ jobs:
           - os: windows-latest
             flags: --win --x64
           - os: ubuntu-latest
-            flags: --linux --x64
+            flags: --linux AppImage deb pacman --x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -116,6 +116,9 @@ jobs:
           npm run lint
           npm test
       - run: npm run build
+      - name: Tools the package for Arch is made with
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libarchive-tools zstd
       - name: Package
         run: npx electron-builder ${{ matrix.flags }} --publish never
         env:
@@ -127,7 +130,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           files=()
-          for file in dist/*.dmg dist/*.zip dist/*.exe dist/*.AppImage dist/*.deb dist/*.yml dist/*.blockmap; do
+          for file in dist/*.dmg dist/*.zip dist/*.exe dist/*.AppImage dist/*.deb dist/*.pkg.tar.zst dist/*.yml dist/*.blockmap; do
             case "$file" in dist/builder-*.yml) continue ;; esac
             [ -f "$file" ] && files+=("$file")
           done
@@ -232,3 +235,17 @@ jobs:
           $env:KUMODESK_VERSION = $env:TAG.TrimStart('v')
           irm "https://raw.githubusercontent.com/$env:GITHUB_REPOSITORY/main/install.ps1" | iex
           if (-not (Test-Path "$env:LOCALAPPDATA\Programs\kumodesk\kumodesk.exe")) { throw 'kumodesk.exe is not there' }
+
+  # Arch has no machine of its own here: the same check runs inside its official image.
+  try-arch:
+    needs: publish
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install with the script
+        run: |
+          pacman -Sy --noconfirm --needed curl
+          export KUMODESK_VERSION="${TAG#v}"
+          curl -fsSL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/install.sh" | sh
+      - name: It is there
+        run: pacman -Q kumodesk && command -v kumodesk && test -x /opt/Kumodesk/kumodesk

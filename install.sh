@@ -59,17 +59,32 @@ case "$(uname -s)" in
     ;;
   Linux)
     [ "$(uname -m)" = "x86_64" ] || fail "only x86_64 Linux is built so far"
+    as_root() {
+      if [ "$(id -u)" = 0 ]; then
+        "$@"
+      else
+        command -v sudo >/dev/null 2>&1 || fail "sudo is needed to install the package"
+        sudo "$@"
+      fi
+    }
+    has() { curl -fsIL -o /dev/null "$REPO/releases/download/v$version/$1"; }
+    arch_package="kumodesk-$version-x86_64.pkg.tar.zst"
     if command -v apt-get >/dev/null 2>&1; then
       file="kumodesk_${version}_amd64.deb"
       fetch "$file"
       chmod 644 "$tmp/$file"
       chmod 755 "$tmp"
-      if [ "$(id -u)" = 0 ]; then
-        apt-get install -y "$tmp/$file"
-      else
-        command -v sudo >/dev/null 2>&1 || fail "sudo is needed to install the package"
-        sudo apt-get install -y "$tmp/$file"
-      fi
+      as_root apt-get install -y "$tmp/$file"
+      say "kumodesk $version is installed. Start it from the applications menu or: kumodesk"
+    # Arch and its relatives. Versions before 0.1.27 have no package for them and get the AppImage.
+    elif command -v pacman >/dev/null 2>&1 && has "$arch_package"; then
+      fetch "$arch_package"
+      chmod 644 "$tmp/$arch_package"
+      chmod 755 "$tmp"
+      as_root pacman -U --noconfirm "$tmp/$arch_package"
+      # A copy put in the home folder by this script before there was a package would be found first.
+      home="${XDG_DATA_HOME:-$HOME/.local/share}"
+      rm -f "$HOME/.local/bin/kumodesk" "$home/applications/kumodesk.desktop" "$home/kumodesk/kumodesk.AppImage"
       say "kumodesk $version is installed. Start it from the applications menu or: kumodesk"
     else
       file="kumodesk-$version.AppImage"
@@ -82,10 +97,11 @@ case "$(uname -s)" in
       cat >"$home/applications/kumodesk.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
-Name=kumodesk
+Name=Kumodesk
 Comment=An infinite board for your windows
 Exec=$home/kumodesk/kumodesk.AppImage %U
 Terminal=false
+StartupWMClass=kumodesk
 Categories=Office;Utility;
 DESKTOP
       say "kumodesk $version is in $home/kumodesk. Start it from the applications menu or: ~/.local/bin/kumodesk"

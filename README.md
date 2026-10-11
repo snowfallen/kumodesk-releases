@@ -22,7 +22,7 @@ Take the file for your system from the [latest release](../../releases/latest).
 | ------- | -------------------------------------------------------------------- |
 | macOS   | `kumodesk-…-arm64.dmg` for Apple silicon, `kumodesk-…-x64.dmg` for Intel |
 | Windows | `kumodesk-…-setup.exe`                                               |
-| Linux   | `kumodesk-….AppImage`, or `kumodesk_…_amd64.deb`                     |
+| Linux   | `kumodesk_…_amd64.deb` (Debian, Ubuntu), `kumodesk-…-x86_64.pkg.tar.zst` (Arch), or `kumodesk-….AppImage` (anywhere) |
 
 ## Install
 
