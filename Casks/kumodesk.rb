@@ -1,9 +1,9 @@
 cask "kumodesk" do
   arch arm: "arm64", intel: "x64"
 
-  version "0.1.34"
-  sha256 arm:   "33223e6921ccad952ad8afee4ff13a0fb8a9eb7be83c5744d8224b762f22cf6f",
-         intel: "b05908347b18271f65ebfda9d3df037ae75939fa6e7ff051d1323ba3feffc9c1"
+  version "0.1.35"
+  sha256 arm:   "d245f183bb3d77ad06882492ce3fa81e73b1e1c2c9e3ed6d0d3bc7e0df90c226",
+         intel: "f0c301a48a85f104f827bdff7526d69fcfc01fe95487ce6089e57839b945ba8d"
 
   url "https://github.com/snowfallen/kumodesk-releases/releases/download/v#{version}/kumodesk-#{version}-#{arch}.dmg"
   name "Kumodesk"
